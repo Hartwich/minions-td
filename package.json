@@ -1,6 +1,7 @@
 {
   "name": "@open-party-lab/game-minions-td",
   "version": "0.1.0",
+  "description": "Competitive tower-defense game for Open Party Lab where players build towers and send minions.",
   "private": false,
   "license": "Apache-2.0",
   "type": "module",
@@ -36,7 +37,8 @@
     "dist",
     "public",
     "README.md",
-    "AGENTS.md"
+    "AGENTS.md",
+    "docs"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",

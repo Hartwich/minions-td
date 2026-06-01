@@ -1,19 +1,64 @@
-name: CI
+﻿name: CI
 
 on:
+  pull_request:
   push:
     branches: [main]
-  pull_request:
+
+permissions:
+  contents: read
 
 jobs:
-  checks:
+  verify:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out game
+        uses: actions/checkout@v4
+        with:
+          path: game
+
+      - name: Check out platform packages
+        uses: actions/checkout@v4
+        with:
+          repository: Hartwich/Open-Party-Lab
+          path: platform
+
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 20
           cache: npm
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm run build
+          cache-dependency-path: |
+            game/package-lock.json
+            platform/package-lock.json
+
+      - name: Install platform dependencies
+        working-directory: platform
+        run: npm ci
+
+      - name: Build platform packages
+        working-directory: platform
+        run: npm run build:packages
+
+      - name: Install game dependencies
+        working-directory: game
+        run: npm ci
+
+      - name: Link platform packages
+        working-directory: game
+        run: |
+          mkdir -p node_modules/@open-party-lab
+          for package in game-core protocol ui-kit utils; do
+            ln -sfn "$GITHUB_WORKSPACE/platform/packages/$package" "node_modules/@open-party-lab/$package"
+          done
+
+      - name: Run typecheck
+        working-directory: game
+        run: npm run typecheck
+
+      - name: Run build
+        working-directory: game
+        run: npm run build
+
+      - name: Dry-run npm package
+        working-directory: game
+        run: npm run pack:dry-run

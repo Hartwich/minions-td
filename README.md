@@ -6,7 +6,7 @@ Competitive tower-defense game for Open Party Lab where players build towers and
 
 ## Status
 
-Alpha. The tower placement, minion sending, and lobby setup loops are playable. Needs map variety, economy tuning, and balance passes.
+Beta. The tower placement, minion sending, and lobby setup loops are already good to play locally. Still needs map variety, economy tuning, and balance passes before a stable release.
 
 ## Run Through Open Party Lab
 

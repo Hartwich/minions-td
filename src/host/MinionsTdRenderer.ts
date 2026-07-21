@@ -16,6 +16,7 @@ export interface MinionsTdPanelRect {
 export interface MinionsTdPanelLayout {
   panelRects: MinionsTdPanelRect[];
   mapRects: MinionsTdPanelRect[];
+  rotationQuarterTurns: number[];
   titleHeight: number;
   footerHeight: number;
   cellSize: number;
@@ -70,21 +71,81 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-function resolveMapCellRect(mapRect: MinionsTdPanelRect, map: MinionsTdMapState, col: number, row: number): MinionsTdPanelRect {
-  const cellWidth = mapRect.width / map.cols;
-  const cellHeight = mapRect.height / map.rows;
+function resolveVisualMapDimensions(
+  map: MinionsTdMapState,
+  rotationQuarterTurns: number
+): { cols: number; rows: number } {
+  return rotationQuarterTurns % 2 === 0
+    ? { cols: map.cols, rows: map.rows }
+    : { cols: map.rows, rows: map.cols };
+}
+
+function resolveRotatedCell(
+  map: MinionsTdMapState,
+  col: number,
+  row: number,
+  rotationQuarterTurns: number
+): { col: number; row: number } {
+  switch (rotationQuarterTurns % 4) {
+    case 1:
+      return { col: map.rows - 1 - row, row: col };
+    case 2:
+      return { col: map.cols - 1 - col, row: map.rows - 1 - row };
+    case 3:
+      return { col: row, row: map.cols - 1 - col };
+    default:
+      return { col, row };
+  }
+}
+
+function resolveMapCellRect(
+  mapRect: MinionsTdPanelRect,
+  map: MinionsTdMapState,
+  col: number,
+  row: number,
+  rotationQuarterTurns = 0
+): MinionsTdPanelRect {
+  const dimensions = resolveVisualMapDimensions(map, rotationQuarterTurns);
+  const rotatedCell = resolveRotatedCell(map, col, row, rotationQuarterTurns);
+  const cellWidth = mapRect.width / dimensions.cols;
+  const cellHeight = mapRect.height / dimensions.rows;
   return {
-    x: mapRect.x + col * cellWidth,
-    y: mapRect.y + row * cellHeight,
+    x: mapRect.x + rotatedCell.col * cellWidth,
+    y: mapRect.y + rotatedCell.row * cellHeight,
     width: cellWidth,
     height: cellHeight
   };
 }
 
-function resolveMapPoint(mapRect: MinionsTdPanelRect, map: MinionsTdMapState, x: number, y: number): { x: number; y: number } {
+function resolveMapPoint(
+  mapRect: MinionsTdPanelRect,
+  map: MinionsTdMapState,
+  x: number,
+  y: number,
+  rotationQuarterTurns = 0
+): { x: number; y: number } {
+  const dimensions = resolveVisualMapDimensions(map, rotationQuarterTurns);
+  let rotatedX = x;
+  let rotatedY = y;
+
+  switch (rotationQuarterTurns % 4) {
+    case 1:
+      rotatedX = map.rows - y;
+      rotatedY = x;
+      break;
+    case 2:
+      rotatedX = map.cols - x;
+      rotatedY = map.rows - y;
+      break;
+    case 3:
+      rotatedX = y;
+      rotatedY = map.cols - x;
+      break;
+  }
+
   return {
-    x: mapRect.x + x * (mapRect.width / map.cols),
-    y: mapRect.y + y * (mapRect.height / map.rows)
+    x: mapRect.x + rotatedX * (mapRect.width / dimensions.cols),
+    y: mapRect.y + rotatedY * (mapRect.height / dimensions.rows)
   };
 }
 
@@ -182,21 +243,30 @@ export function destroyMinionsTdSpriteLayer(layer: MinionsTdSpriteLayer): void {
 }
 
 export function resolveMinionsTdPanelLayout(scene: Phaser.Scene, state: MinionsTdState): MinionsTdPanelLayout {
-  const horizontalPadding = 10;
-  const topPadding = 70;
-  const bottomPadding = 10;
-  const gap = 10;
+  const horizontalPadding = 4;
+  const topPadding = 54;
+  const bottomPadding = 4;
+  const gap = 4;
   const width = Math.max(640, scene.scale.width);
   const height = Math.max(360, scene.scale.height);
   const panelWidth = Math.floor((width - horizontalPadding * 2 - gap) / 2);
   const panelHeight = Math.floor((height - topPadding - bottomPadding - gap) / 2);
-  const titleHeight = 50;
-  const footerHeight = 38;
+  const titleHeight = 32;
+  const footerHeight = 0;
+  const playerCount = Math.min(4, state.players.length);
+  const occupiedQuadrants =
+    playerCount === 2 ? [0, 2] : playerCount === 3 ? [0, 1, 3] : [0, 1, 2, 3];
+  const quadrantPositions = [
+    { col: 0, row: 0 },
+    { col: 1, row: 0 },
+    { col: 1, row: 1 },
+    { col: 0, row: 1 }
+  ];
 
   const panelRects: MinionsTdPanelRect[] = [];
-  for (let index = 0; index < 4; index += 1) {
-    const col = index % 2;
-    const row = Math.floor(index / 2);
+  for (let index = 0; index < playerCount; index += 1) {
+    const quadrant = occupiedQuadrants[index] ?? index;
+    const { col, row } = quadrantPositions[quadrant] ?? quadrantPositions[0];
     panelRects.push({
       x: horizontalPadding + col * (panelWidth + gap),
       y: topPadding + row * (panelHeight + gap),
@@ -207,18 +277,33 @@ export function resolveMinionsTdPanelLayout(scene: Phaser.Scene, state: MinionsT
 
   const referencePanelWidth = panelRects[0]?.width ?? panelWidth;
   const referencePanelHeight = panelRects[0]?.height ?? panelHeight;
-  const mapWidth = referencePanelWidth - 30;
-  const mapHeight = referencePanelHeight - titleHeight - footerHeight - 30;
-  const cellSize = Math.min(mapWidth / state.map.cols, mapHeight / state.map.rows);
+  const mapWidth = referencePanelWidth - 8;
+  const mapHeight = referencePanelHeight - titleHeight - footerHeight - 4;
+  const rotationQuarterTurns = occupiedQuadrants.slice(0, playerCount);
+  const mapRects = panelRects.map((panelRect, index) => {
+    const quadrant = rotationQuarterTurns[index] ?? 0;
+    const dimensions = resolveVisualMapDimensions(state.map, quadrant);
+    const localCellSize = Math.min(mapWidth / dimensions.cols, mapHeight / dimensions.rows);
+    const renderedWidth = dimensions.cols * localCellSize;
+    const renderedHeight = dimensions.rows * localCellSize;
+    const isRight = quadrant === 1 || quadrant === 2;
+    const isBottom = quadrant >= 2;
+
+    return {
+      x: isRight ? panelRect.x : panelRect.x + panelRect.width - renderedWidth,
+      y: isBottom ? panelRect.y : panelRect.y + panelRect.height - renderedHeight,
+      width: renderedWidth,
+      height: renderedHeight
+    };
+  });
+  const cellSize = mapRects.length > 0
+    ? Math.min(mapRects[0].width, mapRects[0].height) / Math.min(state.map.cols, state.map.rows)
+    : 0;
 
   return {
     panelRects,
-    mapRects: panelRects.map((panelRect) => ({
-      x: panelRect.x + (panelRect.width - state.map.cols * cellSize) / 2,
-      y: panelRect.y + titleHeight,
-      width: state.map.cols * cellSize,
-      height: state.map.rows * cellSize
-    })),
+    mapRects,
+    rotationQuarterTurns,
     titleHeight,
     footerHeight,
     cellSize
@@ -229,20 +314,20 @@ function drawMapGrid(
   graphics: Phaser.GameObjects.Graphics,
   panelRect: MinionsTdPanelRect,
   mapRect: MinionsTdPanelRect,
-  map: MinionsTdMapState
+  map: MinionsTdMapState,
+  rotationQuarterTurns: number
 ): void {
+  void panelRect;
+  const dimensions = resolveVisualMapDimensions(map, rotationQuarterTurns);
   graphics.lineStyle(1, 0x1f2937, 0.65);
-  for (let col = 0; col <= map.cols; col += 1) {
-    const x = mapRect.x + col * (mapRect.width / map.cols);
+  for (let col = 0; col <= dimensions.cols; col += 1) {
+    const x = mapRect.x + col * (mapRect.width / dimensions.cols);
     graphics.lineBetween(x, mapRect.y, x, mapRect.y + mapRect.height);
   }
-  for (let row = 0; row <= map.rows; row += 1) {
-    const y = mapRect.y + row * (mapRect.height / map.rows);
+  for (let row = 0; row <= dimensions.rows; row += 1) {
+    const y = mapRect.y + row * (mapRect.height / dimensions.rows);
     graphics.lineBetween(mapRect.x, y, mapRect.x + mapRect.width, y);
   }
-
-  graphics.lineStyle(2, 0x94a3b8, 0.25);
-  graphics.strokeRoundedRect(panelRect.x + 1, panelRect.y + 1, panelRect.width - 2, panelRect.height - 2, 18);
 }
 
 function drawPanelBackdrop(
@@ -251,21 +336,21 @@ function drawPanelBackdrop(
   mapRect: MinionsTdPanelRect,
   player: MinionsTdPlayerBoardState | null
 ): void {
-  graphics.fillStyle(0x0f172a, player?.alive ? 0.92 : 0.68);
-  graphics.fillRoundedRect(panelRect.x, panelRect.y, panelRect.width, panelRect.height, 18);
-  graphics.lineStyle(2, player ? toColor(player.color) : 0x334155, 0.9);
-  graphics.strokeRoundedRect(panelRect.x, panelRect.y, panelRect.width, panelRect.height, 18);
+  void panelRect;
   graphics.fillStyle(0x020617, 0.65);
-  graphics.fillRoundedRect(mapRect.x, mapRect.y, mapRect.width, mapRect.height, 10);
+  graphics.fillRect(mapRect.x, mapRect.y, mapRect.width, mapRect.height);
+  graphics.lineStyle(2, player ? toColor(player.color) : 0x334155, player?.alive ? 0.82 : 0.45);
+  graphics.strokeRect(mapRect.x, mapRect.y, mapRect.width, mapRect.height);
 }
 
 function drawPathCells(
   graphics: Phaser.GameObjects.Graphics,
   mapRect: MinionsTdPanelRect,
-  map: MinionsTdMapState
+  map: MinionsTdMapState,
+  rotationQuarterTurns: number
 ): number {
   for (const cell of map.pathCells) {
-    const cellRect = resolveMapCellRect(mapRect, map, cell.col, cell.row);
+    const cellRect = resolveMapCellRect(mapRect, map, cell.col, cell.row, rotationQuarterTurns);
     graphics.fillStyle(0x082f49, 0.98);
     graphics.fillRect(cellRect.x, cellRect.y, cellRect.width, cellRect.height);
     graphics.fillStyle(0x7dd3fc, 0.18);
@@ -280,10 +365,11 @@ function drawPathCells(
 function drawBuildSlots(
   graphics: Phaser.GameObjects.Graphics,
   mapRect: MinionsTdPanelRect,
-  map: MinionsTdMapState
+  map: MinionsTdMapState,
+  rotationQuarterTurns: number
 ): number {
   for (const slot of map.buildSlots) {
-    const cellRect = resolveMapCellRect(mapRect, map, slot.col, slot.row);
+    const cellRect = resolveMapCellRect(mapRect, map, slot.col, slot.row, rotationQuarterTurns);
     const cornerRadius = Math.min(cellRect.width, cellRect.height) * 0.12;
     graphics.fillStyle(0x0f172a, 0.3);
     graphics.fillRoundedRect(cellRect.x + cellRect.width * 0.06, cellRect.y + cellRect.height * 0.06, cellRect.width * 0.88, cellRect.height * 0.88, cornerRadius);
@@ -301,7 +387,8 @@ function drawTower(
   graphics: Phaser.GameObjects.Graphics,
   mapRect: MinionsTdPanelRect,
   map: MinionsTdMapState,
-  tower: MinionsTdPlayerBoardState["towers"][number]
+  tower: MinionsTdPlayerBoardState["towers"][number],
+  rotationQuarterTurns: number
 ): void {
   if (scene.textures.exists(resolveMinionsTdTowerSpriteKey(tower.towerTypeId))) {
     return;
@@ -312,7 +399,7 @@ function drawTower(
     return;
   }
 
-  const cellRect = resolveMapCellRect(mapRect, map, slot.col, slot.row);
+  const cellRect = resolveMapCellRect(mapRect, map, slot.col, slot.row, rotationQuarterTurns);
   const centerX = cellRect.x + cellRect.width / 2;
   const centerY = cellRect.y + cellRect.height / 2;
   const radius = Math.min(cellRect.width, cellRect.height) * 0.28;
@@ -330,7 +417,8 @@ function drawEnemy(
   graphics: Phaser.GameObjects.Graphics,
   mapRect: MinionsTdPanelRect,
   map: MinionsTdMapState,
-  enemy: MinionsTdPlayerBoardState["enemies"][number]
+  enemy: MinionsTdPlayerBoardState["enemies"][number],
+  rotationQuarterTurns: number
 ): void {
   if (scene.textures.exists(resolveMinionsTdEnemySpriteKey(enemy.enemyTypeId))) {
     return;
@@ -340,10 +428,10 @@ function drawEnemy(
     return;
   }
 
-  const cellWidth = mapRect.width / map.cols;
-  const cellHeight = mapRect.height / map.rows;
-  const x = mapRect.x + enemy.x * cellWidth;
-  const y = mapRect.y + enemy.y * cellHeight;
+  const dimensions = resolveVisualMapDimensions(map, rotationQuarterTurns);
+  const cellWidth = mapRect.width / dimensions.cols;
+  const cellHeight = mapRect.height / dimensions.rows;
+  const { x, y } = resolveMapPoint(mapRect, map, enemy.x, enemy.y, rotationQuarterTurns);
   const radius = Math.min(cellWidth, cellHeight) * 0.22;
 
   graphics.fillStyle(toColor(enemy.color), 0.94);
@@ -359,7 +447,8 @@ function drawEnemyHealthBar(
   mapRect: MinionsTdPanelRect,
   map: MinionsTdMapState,
   enemy: MinionsTdPlayerBoardState["enemies"][number],
-  alpha: number
+  alpha: number,
+  rotationQuarterTurns: number
 ): void {
   if (enemy.maxHp <= 0) {
     return;
@@ -369,10 +458,10 @@ function drawEnemyHealthBar(
     return;
   }
 
-  const cellWidth = mapRect.width / map.cols;
-  const cellHeight = mapRect.height / map.rows;
-  const x = mapRect.x + enemy.x * cellWidth;
-  const y = mapRect.y + enemy.y * cellHeight;
+  const dimensions = resolveVisualMapDimensions(map, rotationQuarterTurns);
+  const cellWidth = mapRect.width / dimensions.cols;
+  const cellHeight = mapRect.height / dimensions.rows;
+  const { x, y } = resolveMapPoint(mapRect, map, enemy.x, enemy.y, rotationQuarterTurns);
   const displaySize = Math.min(cellWidth, cellHeight) * 0.84;
   const barWidth = Math.max(12, displaySize * 0.84);
   const barHeight = Math.max(3, displaySize * 0.14);
@@ -553,23 +642,27 @@ function drawProjectiles(
   graphics: Phaser.GameObjects.Graphics,
   mapRect: MinionsTdPanelRect,
   map: MinionsTdMapState,
-  projectiles: MinionsTdPlayerBoardState["projectiles"]
+  projectiles: MinionsTdPlayerBoardState["projectiles"],
+  rotationQuarterTurns: number
 ): void {
   if (projectiles.length === 0) {
     return;
   }
 
-  const cellWidth = mapRect.width / map.cols;
-  const cellHeight = mapRect.height / map.rows;
+  const dimensions = resolveVisualMapDimensions(map, rotationQuarterTurns);
+  const cellWidth = mapRect.width / dimensions.cols;
+  const cellHeight = mapRect.height / dimensions.rows;
 
   for (const projectile of projectiles) {
     const fade = clamp(projectile.remainingMs / Math.max(1, projectile.maxLifetimeMs), 0, 1);
     const alpha = Math.max(0.18, fade);
     const progress = 1 - fade;
-    const startX = mapRect.x + projectile.x * cellWidth;
-    const startY = mapRect.y + projectile.y * cellHeight;
-    const targetX = mapRect.x + projectile.targetX * cellWidth;
-    const targetY = mapRect.y + projectile.targetY * cellHeight;
+    const start = resolveMapPoint(mapRect, map, projectile.x, projectile.y, rotationQuarterTurns);
+    const target = resolveMapPoint(mapRect, map, projectile.targetX, projectile.targetY, rotationQuarterTurns);
+    const startX = start.x;
+    const startY = start.y;
+    const targetX = target.x;
+    const targetY = target.y;
     const radius = Math.max(2, Math.min(cellWidth, cellHeight) * projectile.radius);
     const cellSize = Math.min(cellWidth, cellHeight);
 
@@ -609,6 +702,13 @@ export function syncMinionsTdStaticLayer(
     const mapRect = layout.mapRects[index];
     const panelImage = layer.panelImages[index];
     const textureKey = layer.textureKeys[index];
+
+    if (!player || !panelRect || !mapRect) {
+      panelImage.setVisible(false);
+      continue;
+    }
+
+    const rotationQuarterTurns = layout.rotationQuarterTurns[index] ?? 0;
     const localMapRect = resolveLocalMapRect(panelRect, mapRect);
 
     panelImage.setVisible(true);
@@ -623,12 +723,12 @@ export function syncMinionsTdStaticLayer(
 
     const vectorStart = performance.now();
     drawPanelBackdrop(layer.scratchGraphics, panelLocalRect, localMapRect, player);
-    drawMapGrid(layer.scratchGraphics, panelLocalRect, localMapRect, state.map);
+    drawMapGrid(layer.scratchGraphics, panelLocalRect, localMapRect, state.map, rotationQuarterTurns);
     vectorRasterMs += performance.now() - vectorStart;
 
     const stampStart = performance.now();
-    pathStampCount += drawPathCells(layer.scratchGraphics, localMapRect, state.map);
-    buildSlotStampCount += drawBuildSlots(layer.scratchGraphics, localMapRect, state.map);
+    pathStampCount += drawPathCells(layer.scratchGraphics, localMapRect, state.map, rotationQuarterTurns);
+    buildSlotStampCount += drawBuildSlots(layer.scratchGraphics, localMapRect, state.map, rotationQuarterTurns);
     if (scene.textures.exists(textureKey)) {
       scene.textures.remove(textureKey);
     }
@@ -638,7 +738,8 @@ export function syncMinionsTdStaticLayer(
     tileStampMs += performance.now() - stampStart;
 
     staticTexturePixels += panelRect.width * panelRect.height;
-    gridLineCount += state.map.cols + 1 + state.map.rows + 1;
+    const dimensions = resolveVisualMapDimensions(state.map, rotationQuarterTurns);
+    gridLineCount += dimensions.cols + 1 + dimensions.rows + 1;
   }
 
   layer.textureBuildCount += 1;
@@ -676,14 +777,15 @@ export function drawMinionsTdDynamicState(
       continue;
     }
 
-    drawProjectiles(graphics, mapRect, state.map, player.projectiles);
+    const rotationQuarterTurns = layout.rotationQuarterTurns[index] ?? 0;
+    drawProjectiles(graphics, mapRect, state.map, player.projectiles, rotationQuarterTurns);
 
     for (const tower of player.towers) {
-      drawTower(scene, graphics, mapRect, state.map, tower);
+      drawTower(scene, graphics, mapRect, state.map, tower, rotationQuarterTurns);
     }
 
     for (const enemy of player.enemies) {
-      drawEnemy(scene, graphics, mapRect, state.map, enemy);
+      drawEnemy(scene, graphics, mapRect, state.map, enemy, rotationQuarterTurns);
     }
   }
 }
@@ -704,9 +806,10 @@ export function drawMinionsTdEnemyHealthBars(
     }
 
     const alpha = player.alive ? 1 : 0.55;
+    const rotationQuarterTurns = layout.rotationQuarterTurns[index] ?? 0;
 
     for (const enemy of player.enemies) {
-      drawEnemyHealthBar(graphics, mapRect, state.map, enemy, alpha);
+      drawEnemyHealthBar(graphics, mapRect, state.map, enemy, alpha, rotationQuarterTurns);
     }
   }
 }
@@ -728,11 +831,16 @@ export function syncMinionsTdSpriteLayer(
       continue;
     }
 
+    const rotationQuarterTurns = layout.rotationQuarterTurns[playerIndex] ?? 0;
+    const dimensions = resolveVisualMapDimensions(state.map, rotationQuarterTurns);
+
     for (const tower of player.towers) {
       const towerKey = `${player.playerId}:${tower.id}`;
       const spriteKey = resolveMinionsTdTowerSpriteKey(tower.towerTypeId);
       const slot = resolveBuildSlotById(state.map, tower.slotId);
-      const cellRect = slot ? resolveMapCellRect(mapRect, state.map, slot.col, slot.row) : null;
+      const cellRect = slot
+        ? resolveMapCellRect(mapRect, state.map, slot.col, slot.row, rotationQuarterTurns)
+        : null;
 
       if (!slot || !cellRect || !scene.textures.exists(spriteKey)) {
         const existingSprite = layer.towerSprites.get(towerKey);
@@ -788,8 +896,8 @@ export function syncMinionsTdSpriteLayer(
         enemySprite.setTexture(spriteKey);
       }
 
-      const position = resolveMapPoint(mapRect, state.map, enemy.x, enemy.y);
-      const displaySize = Math.min(mapRect.width / state.map.cols, mapRect.height / state.map.rows) * 0.84;
+      const position = resolveMapPoint(mapRect, state.map, enemy.x, enemy.y, rotationQuarterTurns);
+      const displaySize = Math.min(mapRect.width / dimensions.cols, mapRect.height / dimensions.rows) * 0.84;
       enemySprite.setVisible(true);
       enemySprite.setPosition(position.x, position.y);
       enemySprite.setDisplaySize(displaySize, displaySize);
@@ -814,21 +922,11 @@ export function syncMinionsTdSpriteLayer(
 }
 
 export function buildMinionsTdPanelHeader(player: MinionsTdPlayerBoardState | null, index: number, language?: SupportedLanguage): string {
-  const en = language === "en";
+  void index;
+  void language;
   if (!player) {
-    return `Slot ${index + 1}\n${en ? "Waiting for player" : "Wartet auf Spieler"}`;
+    return "";
   }
 
-  const target = player.outgoingToPlayerName ?? (en ? "nobody" : "niemand");
-  return `${player.name}\n${en ? "Lives" : "Leben"} ${player.lives} | -> ${target}`;
-}
-
-export function buildMinionsTdPanelFooter(player: MinionsTdPlayerBoardState | null, language?: SupportedLanguage): string {
-  const en = language === "en";
-  if (!player) {
-    return en ? "No active player" : "Kein Spieler aktiv";
-  }
-
-  const status = player.alive ? (en ? "active" : "aktiv") : en ? "defeated" : "besiegt";
-  return `Tower ${player.towers.length} | Minions ${player.enemies.length} | Kills ${player.kills} | ${status}`;
+  return `${player.name}   ♥ ${player.lives}`;
 }

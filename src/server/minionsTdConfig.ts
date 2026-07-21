@@ -92,6 +92,27 @@ function buildPathFromWaypoints(
   return pathCells;
 }
 
+function buildClockwisePathFromWaypoints(
+  cols: number,
+  rows: number,
+  waypoints: readonly (readonly [col: number, row: number])[]
+): MinionsTdMapPathCellState[] {
+  const first = waypoints[0];
+  const last = waypoints[waypoints.length - 1];
+
+  if (!first || !last) {
+    return [];
+  }
+
+  return buildPathFromWaypoints([
+    [0, rows - 1],
+    [first[0], rows - 1],
+    ...waypoints,
+    [last[0], 0],
+    [cols - 1, 0]
+  ]);
+}
+
 function towerIconPath(towerId: string): string {
   return `/minions-td/tower-icons/${towerId}.svg`;
 }
@@ -188,7 +209,7 @@ export const minionsTdRoomSettingKeys = {
   startingGold: "minionsTdStartingGold"
 } as const;
 
-const switchbackPathCells = buildPathFromWaypoints([
+const switchbackPathCells = buildClockwisePathFromWaypoints(12, 8, [
   [0, 2],
   [6, 2],
   [6, 4],
@@ -197,7 +218,7 @@ const switchbackPathCells = buildPathFromWaypoints([
   [11, 6]
 ]);
 
-const causewayPathCells = buildPathFromWaypoints([
+const causewayPathCells = buildClockwisePathFromWaypoints(12, 8, [
   [0, 1],
   [4, 1],
   [4, 5],
@@ -206,7 +227,7 @@ const causewayPathCells = buildPathFromWaypoints([
   [11, 2]
 ]);
 
-const zigguratPathCells = buildPathFromWaypoints([
+const zigguratPathCells = buildClockwisePathFromWaypoints(12, 8, [
   [0, 6],
   [2, 6],
   [2, 4],
@@ -217,7 +238,7 @@ const zigguratPathCells = buildPathFromWaypoints([
   [11, 4]
 ]);
 
-const crossroadsPathCells = buildPathFromWaypoints([
+const crossroadsPathCells = buildClockwisePathFromWaypoints(12, 8, [
   [0, 3],
   [2, 3],
   [2, 1],
@@ -228,7 +249,7 @@ const crossroadsPathCells = buildPathFromWaypoints([
   [11, 5]
 ]);
 
-const lockstepPathCells = buildPathFromWaypoints([
+const lockstepPathCells = buildClockwisePathFromWaypoints(12, 8, [
   [0, 5],
   [3, 5],
   [3, 3],
@@ -239,7 +260,7 @@ const lockstepPathCells = buildPathFromWaypoints([
   [11, 3]
 ]);
 
-const harborPathCells = buildPathFromWaypoints([
+const harborPathCells = buildClockwisePathFromWaypoints(12, 8, [
   [0, 1],
   [2, 1],
   [2, 3],
@@ -252,7 +273,7 @@ const harborPathCells = buildPathFromWaypoints([
   [11, 5]
 ]);
 
-const serpentinePathCells = buildPathFromWaypoints([
+const serpentinePathCells = buildClockwisePathFromWaypoints(16, 10, [
   [1, 0],
   [1, 8],
   [4, 8],
@@ -265,7 +286,7 @@ const serpentinePathCells = buildPathFromWaypoints([
   [14, 9]
 ]);
 
-const redoubtPathCells = buildPathFromWaypoints([
+const redoubtPathCells = buildClockwisePathFromWaypoints(16, 10, [
   [13, 0],
   [13, 8],
   [3, 8],
@@ -279,7 +300,7 @@ const redoubtPathCells = buildPathFromWaypoints([
   [1, 9]
 ]);
 
-const overpassPathCells = buildPathFromWaypoints([
+const overpassPathCells = buildClockwisePathFromWaypoints(12, 12, [
   [0, 1],
   [10, 1],
   [10, 3],
@@ -292,7 +313,7 @@ const overpassPathCells = buildPathFromWaypoints([
   [11, 11]
 ]);
 
-const bastionPathCells = buildPathFromWaypoints([
+const bastionPathCells = buildClockwisePathFromWaypoints(12, 12, [
   [0, 10],
   [11, 10],
   [11, 2],

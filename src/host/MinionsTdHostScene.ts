@@ -2,7 +2,6 @@ import Phaser from "phaser";
 import type { SupportedLanguage } from "@open-party-lab/game-core";
 import type { MinionsTdState } from "../protocol.js";
 import {
-  buildMinionsTdPanelFooter,
   buildMinionsTdPanelHeader,
   createMinionsTdStaticLayer,
   createMinionsTdSpriteLayer,
@@ -63,7 +62,6 @@ export class MinionsTdHostScene extends Phaser.Scene {
   private titleText?: Phaser.GameObjects.Text;
   private subtitleText?: Phaser.GameObjects.Text;
   private panelHeaderTexts: Phaser.GameObjects.Text[] = [];
-  private panelFooterTexts: Phaser.GameObjects.Text[] = [];
   private spriteLayer = createMinionsTdSpriteLayer();
   private lastStaticKey: string | null = null;
   private lastLayout: MinionsTdPanelLayout | null = null;
@@ -115,16 +113,6 @@ export class MinionsTdHostScene extends Phaser.Scene {
         align: "left"
       }).setDepth(10)
     );
-    this.panelFooterTexts = Array.from({ length: 4 }, () =>
-      this.add.text(0, 0, "", {
-        fontFamily: hostTheme.bodyFont,
-        fontSize: "13px",
-        color: hostTheme.muted,
-        align: "left",
-        wordWrap: { width: 260 }
-      }).setDepth(10)
-    );
-
     this.unsubscribe = client.subscribe((state) => {
       const renderStamp = [
         state.room?.code ?? "----",
@@ -167,11 +155,7 @@ export class MinionsTdHostScene extends Phaser.Scene {
       for (const text of this.panelHeaderTexts) {
         text.destroy();
       }
-      for (const text of this.panelFooterTexts) {
-        text.destroy();
-      }
       this.panelHeaderTexts = [];
-      this.panelFooterTexts = [];
       destroyMinionsTdSpriteLayer(this.spriteLayer);
       this.lastStaticKey = null;
       this.lastLayout = null;
@@ -210,32 +194,34 @@ export class MinionsTdHostScene extends Phaser.Scene {
       const player = state.players[index] ?? null;
       const panelRect = layout.panelRects[index];
       const header = this.panelHeaderTexts[index];
-      const footer = this.panelFooterTexts[index];
 
-      this.setPositionIfChanged(header, panelRect.x + 12, panelRect.y + 10);
-      this.setPositionIfChanged(footer, panelRect.x + 12, panelRect.y + panelRect.height - 30);
+      if (!panelRect) {
+        header.setVisible(false);
+        continue;
+      }
+
+      header.setVisible(true);
+      const quadrant = layout.rotationQuarterTurns[index] ?? 0;
+      const headerY = quadrant >= 2 ? panelRect.y + panelRect.height - 25 : panelRect.y + 5;
+      this.setPositionIfChanged(header, panelRect.x + 8, headerY);
       header.setColor(player?.alive ? player.color : hostTheme.text);
-      footer.setAlpha(player ? 1 : 0.75);
-      footer.setWordWrapWidth(panelRect.width - 24);
     }
   }
 
   private refreshTexts(state: MinionsTdState, roomCode: string, phase: string | undefined, language?: SupportedLanguage): void {
     const en = language === "en";
-    this.setTextIfChanged(this.titleText!, `MinionsTD | ${en ? "Room" : "Raum"} ${roomCode}`);
+    this.setTextIfChanged(this.titleText!, "MinionsTD");
     this.setTextIfChanged(
       this.subtitleText!,
-      `Phase ${phase ?? state.result.outcome} | ${en ? "Players" : "Spieler"} ${state.players.filter((player) => player.alive).length}/${state.players.length} | ` +
-        `${en ? "Endless match" : "Endloses Match"} | ${en ? "Runtime" : "Laufzeit"} ${Math.floor(state.elapsedMs / 1000)}s`
+      `${en ? "Room" : "Raum"} ${roomCode}`
     );
+    void phase;
 
     for (let index = 0; index < 4; index += 1) {
       const player = state.players[index] ?? null;
       const header = this.panelHeaderTexts[index];
-      const footer = this.panelFooterTexts[index];
 
       this.setTextIfChanged(header, buildMinionsTdPanelHeader(player, index, language));
-      this.setTextIfChanged(footer, buildMinionsTdPanelFooter(player, language));
     }
   }
 
@@ -261,9 +247,6 @@ export class MinionsTdHostScene extends Phaser.Scene {
         `${en ? "Room" : "Raum"} ${roomCode} | Phase ${phase ?? "unknown"} | ${en ? "Waiting for game data" : "Warte auf Spieldaten"}`
       );
       for (const text of this.panelHeaderTexts) {
-        this.setTextIfChanged(text, "");
-      }
-      for (const text of this.panelFooterTexts) {
         this.setTextIfChanged(text, "");
       }
       return;

@@ -209,7 +209,7 @@ export const minionsTdRoomSettingKeys = {
   startingGold: "minionsTdStartingGold"
 } as const;
 
-const switchbackPathCells = buildClockwisePathFromWaypoints(12, 8, [
+const switchbackPathCells = buildClockwisePathFromWaypoints(12, 12, [
   [0, 2],
   [6, 2],
   [6, 4],
@@ -218,7 +218,7 @@ const switchbackPathCells = buildClockwisePathFromWaypoints(12, 8, [
   [11, 6]
 ]);
 
-const causewayPathCells = buildClockwisePathFromWaypoints(12, 8, [
+const causewayPathCells = buildClockwisePathFromWaypoints(12, 12, [
   [0, 1],
   [4, 1],
   [4, 5],
@@ -227,7 +227,7 @@ const causewayPathCells = buildClockwisePathFromWaypoints(12, 8, [
   [11, 2]
 ]);
 
-const zigguratPathCells = buildClockwisePathFromWaypoints(12, 8, [
+const zigguratPathCells = buildClockwisePathFromWaypoints(12, 12, [
   [0, 6],
   [2, 6],
   [2, 4],
@@ -238,7 +238,7 @@ const zigguratPathCells = buildClockwisePathFromWaypoints(12, 8, [
   [11, 4]
 ]);
 
-const crossroadsPathCells = buildClockwisePathFromWaypoints(12, 8, [
+const crossroadsPathCells = buildClockwisePathFromWaypoints(12, 12, [
   [0, 3],
   [2, 3],
   [2, 1],
@@ -249,7 +249,7 @@ const crossroadsPathCells = buildClockwisePathFromWaypoints(12, 8, [
   [11, 5]
 ]);
 
-const lockstepPathCells = buildClockwisePathFromWaypoints(12, 8, [
+const lockstepPathCells = buildClockwisePathFromWaypoints(12, 12, [
   [0, 5],
   [3, 5],
   [3, 3],
@@ -260,7 +260,7 @@ const lockstepPathCells = buildClockwisePathFromWaypoints(12, 8, [
   [11, 3]
 ]);
 
-const harborPathCells = buildClockwisePathFromWaypoints(12, 8, [
+const harborPathCells = buildClockwisePathFromWaypoints(12, 12, [
   [0, 1],
   [2, 1],
   [2, 3],
@@ -273,7 +273,7 @@ const harborPathCells = buildClockwisePathFromWaypoints(12, 8, [
   [11, 5]
 ]);
 
-const serpentinePathCells = buildClockwisePathFromWaypoints(16, 10, [
+const serpentinePathCells = buildClockwisePathFromWaypoints(16, 16, [
   [1, 0],
   [1, 8],
   [4, 8],
@@ -286,7 +286,7 @@ const serpentinePathCells = buildClockwisePathFromWaypoints(16, 10, [
   [14, 9]
 ]);
 
-const redoubtPathCells = buildClockwisePathFromWaypoints(16, 10, [
+const redoubtPathCells = buildClockwisePathFromWaypoints(16, 16, [
   [13, 0],
   [13, 8],
   [3, 8],
@@ -331,65 +331,65 @@ export const minionsTdMaps = [
     id: "switchback",
     name: "Switchback",
     cols: 12,
-    rows: 8,
+    rows: 12,
     pathCells: switchbackPathCells,
-    buildSlots: buildAllOpenSlots("a", 12, 8, switchbackPathCells)
+    buildSlots: buildAllOpenSlots("a", 12, 12, switchbackPathCells)
   },
   {
     id: "causeway",
     name: "Causeway",
     cols: 12,
-    rows: 8,
+    rows: 12,
     pathCells: causewayPathCells,
-    buildSlots: buildAllOpenSlots("b", 12, 8, causewayPathCells)
+    buildSlots: buildAllOpenSlots("b", 12, 12, causewayPathCells)
   },
   {
     id: "ziggurat",
     name: "Ziggurat",
     cols: 12,
-    rows: 8,
+    rows: 12,
     pathCells: zigguratPathCells,
-    buildSlots: buildAllOpenSlots("c", 12, 8, zigguratPathCells)
+    buildSlots: buildAllOpenSlots("c", 12, 12, zigguratPathCells)
   },
   {
     id: "crossroads",
     name: "Crossroads",
     cols: 12,
-    rows: 8,
+    rows: 12,
     pathCells: crossroadsPathCells,
-    buildSlots: buildAllOpenSlots("d", 12, 8, crossroadsPathCells)
+    buildSlots: buildAllOpenSlots("d", 12, 12, crossroadsPathCells)
   },
   {
     id: "lockstep",
     name: "Lockstep",
     cols: 12,
-    rows: 8,
+    rows: 12,
     pathCells: lockstepPathCells,
-    buildSlots: buildAllOpenSlots("e", 12, 8, lockstepPathCells)
+    buildSlots: buildAllOpenSlots("e", 12, 12, lockstepPathCells)
   },
   {
     id: "harbor",
     name: "Harbor",
     cols: 12,
-    rows: 8,
+    rows: 12,
     pathCells: harborPathCells,
-    buildSlots: buildAllOpenSlots("f", 12, 8, harborPathCells)
+    buildSlots: buildAllOpenSlots("f", 12, 12, harborPathCells)
   },
   {
     id: "serpentine",
     name: "Serpentine",
     cols: 16,
-    rows: 10,
+    rows: 16,
     pathCells: serpentinePathCells,
-    buildSlots: buildAllOpenSlots("g", 16, 10, serpentinePathCells)
+    buildSlots: buildAllOpenSlots("g", 16, 16, serpentinePathCells)
   },
   {
     id: "redoubt",
     name: "Redoubt",
     cols: 16,
-    rows: 10,
+    rows: 16,
     pathCells: redoubtPathCells,
-    buildSlots: buildAllOpenSlots("h", 16, 10, redoubtPathCells)
+    buildSlots: buildAllOpenSlots("h", 16, 16, redoubtPathCells)
   },
   {
     id: "overpass",

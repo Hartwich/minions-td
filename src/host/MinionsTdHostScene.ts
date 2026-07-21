@@ -22,6 +22,7 @@ import {
 import { loadMinionsTdAssets } from "./minionsTdAssets.js";
 
 const minionsTdTextRefreshMs = 200;
+const minionsTdRenderIntervalMs = 1000 / 30;
 const hostTheme = {
   titleFont: '"Oxanium", "Arial", sans-serif',
   bodyFont: '"Nunito Sans", "Arial", sans-serif',
@@ -54,6 +55,14 @@ interface HostAppStateLike {
   } | null;
 }
 
+interface PendingMinionsTdRender {
+  renderStamp: string;
+  state: MinionsTdState | null;
+  roomCode: string;
+  phase?: string;
+  language?: SupportedLanguage;
+}
+
 export class MinionsTdHostScene extends Phaser.Scene {
   private unsubscribe?: () => void;
   private staticLayer?: MinionsTdStaticLayer;
@@ -66,6 +75,8 @@ export class MinionsTdHostScene extends Phaser.Scene {
   private lastStaticKey: string | null = null;
   private lastLayout: MinionsTdPanelLayout | null = null;
   private lastRenderStamp: string | null = null;
+  private pendingRender?: PendingMinionsTdRender;
+  private lastFrameRenderAtMs = Number.NEGATIVE_INFINITY;
   private lastStaticMetrics: MinionsTdStaticLayerMetrics = emptyMinionsTdStaticLayerMetrics;
   private lastTextRefreshAtMs = 0;
   private staticRedrawCount = 0;
@@ -124,17 +135,17 @@ export class MinionsTdHostScene extends Phaser.Scene {
         state.game?.updatedAt ?? "none"
       ].join("|");
 
-      if (renderStamp === this.lastRenderStamp) {
+      if (renderStamp === this.lastRenderStamp || renderStamp === this.pendingRender?.renderStamp) {
         return;
       }
 
-      this.lastRenderStamp = renderStamp;
-      this.renderState(
-        state.game?.state ? (state.game.state as MinionsTdState) : null,
-        state.room?.code ?? "----",
-        state.game?.phase,
-        state.room?.language
-      );
+      this.pendingRender = {
+        renderStamp,
+        state: state.game?.state ? (state.game.state as MinionsTdState) : null,
+        roomCode: state.room?.code ?? "----",
+        phase: state.game?.phase,
+        language: state.room?.language
+      };
     });
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -160,10 +171,29 @@ export class MinionsTdHostScene extends Phaser.Scene {
       this.lastStaticKey = null;
       this.lastLayout = null;
       this.lastRenderStamp = null;
+      this.pendingRender = undefined;
+      this.lastFrameRenderAtMs = Number.NEGATIVE_INFINITY;
       this.lastStaticMetrics = emptyMinionsTdStaticLayerMetrics;
       this.lastTextRefreshAtMs = 0;
       this.staticRedrawCount = 0;
     });
+  }
+
+  update(time: number): void {
+    if (!this.pendingRender || time - this.lastFrameRenderAtMs < minionsTdRenderIntervalMs) {
+      return;
+    }
+
+    const pendingRender = this.pendingRender;
+    this.pendingRender = undefined;
+    this.lastRenderStamp = pendingRender.renderStamp;
+    this.lastFrameRenderAtMs = time;
+    this.renderState(
+      pendingRender.state,
+      pendingRender.roomCode,
+      pendingRender.phase,
+      pendingRender.language
+    );
   }
 
   private setTextIfChanged(target: Phaser.GameObjects.Text, value: string): void {

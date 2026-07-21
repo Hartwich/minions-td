@@ -25,6 +25,10 @@ export interface MinionsTdPanelLayout {
 export interface MinionsTdSpriteLayer {
   towerSprites: Map<string, Phaser.GameObjects.Image>;
   enemySprites: Map<string, Phaser.GameObjects.Image>;
+  activeTowerIds: Set<string>;
+  activeEnemyIds: Set<string>;
+  towerSpritePool: Phaser.GameObjects.Image[];
+  enemySpritePool: Phaser.GameObjects.Image[];
 }
 
 export interface MinionsTdStaticLayer {
@@ -187,7 +191,11 @@ function createPanelImage(scene: Phaser.Scene): Phaser.GameObjects.Image {
 export function createMinionsTdSpriteLayer(): MinionsTdSpriteLayer {
   return {
     towerSprites: new Map(),
-    enemySprites: new Map()
+    enemySprites: new Map(),
+    activeTowerIds: new Set(),
+    activeEnemyIds: new Set(),
+    towerSpritePool: [],
+    enemySpritePool: []
   };
 }
 
@@ -240,6 +248,18 @@ export function destroyMinionsTdSpriteLayer(layer: MinionsTdSpriteLayer): void {
     sprite.destroy();
   }
   layer.enemySprites.clear();
+
+  for (const sprite of layer.towerSpritePool) {
+    sprite.destroy();
+  }
+  layer.towerSpritePool = [];
+
+  for (const sprite of layer.enemySpritePool) {
+    sprite.destroy();
+  }
+  layer.enemySpritePool = [];
+  layer.activeTowerIds.clear();
+  layer.activeEnemyIds.clear();
 }
 
 export function resolveMinionsTdPanelLayout(scene: Phaser.Scene, state: MinionsTdState): MinionsTdPanelLayout {
@@ -255,7 +275,7 @@ export function resolveMinionsTdPanelLayout(scene: Phaser.Scene, state: MinionsT
   const footerHeight = 0;
   const playerCount = Math.min(4, state.players.length);
   const occupiedQuadrants =
-    playerCount === 2 ? [0, 2] : playerCount === 3 ? [0, 1, 3] : [0, 1, 2, 3];
+    playerCount === 2 ? [0, 1] : playerCount === 3 ? [0, 1, 3] : [0, 1, 2, 3];
   const quadrantPositions = [
     { col: 0, row: 0 },
     { col: 1, row: 0 },
@@ -814,14 +834,56 @@ export function drawMinionsTdEnemyHealthBars(
   }
 }
 
+const maxPooledTowerSprites = 64;
+const maxPooledEnemySprites = 256;
+
+function acquireMinionsTdSprite(
+  scene: Phaser.Scene,
+  pool: Phaser.GameObjects.Image[],
+  textureKey: string,
+  depth: number
+): Phaser.GameObjects.Image {
+  const pooledSprite = pool.pop();
+  const sprite = pooledSprite ?? scene.add.image(0, 0, textureKey).setOrigin(0.5);
+
+  if (pooledSprite) {
+    scene.children.add(sprite);
+  }
+
+  if (sprite.texture.key !== textureKey) {
+    sprite.setTexture(textureKey);
+  }
+
+  sprite.setDepth(depth);
+  sprite.setVisible(true);
+  return sprite;
+}
+
+function releaseMinionsTdSprite(
+  pool: Phaser.GameObjects.Image[],
+  sprite: Phaser.GameObjects.Image,
+  maxPoolSize: number
+): void {
+  sprite.setVisible(false);
+  sprite.removeFromDisplayList();
+
+  if (pool.length < maxPoolSize) {
+    pool.push(sprite);
+  } else {
+    sprite.destroy();
+  }
+}
+
 export function syncMinionsTdSpriteLayer(
   scene: Phaser.Scene,
   layer: MinionsTdSpriteLayer,
   state: MinionsTdState,
   layout: MinionsTdPanelLayout
 ): void {
-  const activeTowerKeys = new Set<string>();
-  const activeEnemyKeys = new Set<string>();
+  const activeTowerIds = layer.activeTowerIds;
+  const activeEnemyIds = layer.activeEnemyIds;
+  activeTowerIds.clear();
+  activeEnemyIds.clear();
 
   for (let playerIndex = 0; playerIndex < state.players.length; playerIndex += 1) {
     const player = state.players[playerIndex];
@@ -835,7 +897,7 @@ export function syncMinionsTdSpriteLayer(
     const dimensions = resolveVisualMapDimensions(state.map, rotationQuarterTurns);
 
     for (const tower of player.towers) {
-      const towerKey = `${player.playerId}:${tower.id}`;
+      const towerId = tower.id;
       const spriteKey = resolveMinionsTdTowerSpriteKey(tower.towerTypeId);
       const slot = resolveBuildSlotById(state.map, tower.slotId);
       const cellRect = slot
@@ -843,80 +905,98 @@ export function syncMinionsTdSpriteLayer(
         : null;
 
       if (!slot || !cellRect || !scene.textures.exists(spriteKey)) {
-        const existingSprite = layer.towerSprites.get(towerKey);
+        const existingSprite = layer.towerSprites.get(towerId);
 
         if (existingSprite) {
-          existingSprite.destroy();
-          layer.towerSprites.delete(towerKey);
+          releaseMinionsTdSprite(layer.towerSpritePool, existingSprite, maxPooledTowerSprites);
+          layer.towerSprites.delete(towerId);
         }
         continue;
       }
 
-      let towerSprite = layer.towerSprites.get(towerKey);
+      let towerSprite = layer.towerSprites.get(towerId);
 
       if (!towerSprite) {
-        towerSprite = scene.add.image(0, 0, spriteKey);
-        towerSprite.setDepth(4);
-        towerSprite.setOrigin(0.5);
-        layer.towerSprites.set(towerKey, towerSprite);
+        towerSprite = acquireMinionsTdSprite(scene, layer.towerSpritePool, spriteKey, 4);
+        layer.towerSprites.set(towerId, towerSprite);
       } else if (towerSprite.texture.key !== spriteKey) {
         towerSprite.setTexture(spriteKey);
       }
 
-      towerSprite.setVisible(true);
-      towerSprite.setPosition(cellRect.x + cellRect.width / 2, cellRect.y + cellRect.height / 2);
+      const x = cellRect.x + cellRect.width / 2;
+      const y = cellRect.y + cellRect.height / 2;
       const displaySize = Math.min(cellRect.width, cellRect.height) * 1.02;
-      towerSprite.setDisplaySize(displaySize, displaySize);
-      towerSprite.setAlpha(player.alive ? 0.98 : 0.45);
-      activeTowerKeys.add(towerKey);
+      const alpha = player.alive ? 0.98 : 0.45;
+
+      if (!towerSprite.visible) {
+        towerSprite.setVisible(true);
+      }
+      if (towerSprite.x !== x || towerSprite.y !== y) {
+        towerSprite.setPosition(x, y);
+      }
+      if (Math.abs(towerSprite.displayWidth - displaySize) > 0.01) {
+        towerSprite.setDisplaySize(displaySize, displaySize);
+      }
+      if (towerSprite.alpha !== alpha) {
+        towerSprite.setAlpha(alpha);
+      }
+      activeTowerIds.add(towerId);
     }
 
     for (const enemy of player.enemies) {
-      const enemyKey = `${player.playerId}:${enemy.id}`;
+      const enemyId = enemy.id;
       const spriteKey = resolveMinionsTdEnemySpriteKey(enemy.enemyTypeId);
 
       if (!scene.textures.exists(spriteKey)) {
-        const existingSprite = layer.enemySprites.get(enemyKey);
+        const existingSprite = layer.enemySprites.get(enemyId);
 
         if (existingSprite) {
-          existingSprite.destroy();
-          layer.enemySprites.delete(enemyKey);
+          releaseMinionsTdSprite(layer.enemySpritePool, existingSprite, maxPooledEnemySprites);
+          layer.enemySprites.delete(enemyId);
         }
         continue;
       }
 
-      let enemySprite = layer.enemySprites.get(enemyKey);
+      let enemySprite = layer.enemySprites.get(enemyId);
 
       if (!enemySprite) {
-        enemySprite = scene.add.image(0, 0, spriteKey);
-        enemySprite.setDepth(5);
-        enemySprite.setOrigin(0.5);
-        layer.enemySprites.set(enemyKey, enemySprite);
+        enemySprite = acquireMinionsTdSprite(scene, layer.enemySpritePool, spriteKey, 5);
+        layer.enemySprites.set(enemyId, enemySprite);
       } else if (enemySprite.texture.key !== spriteKey) {
         enemySprite.setTexture(spriteKey);
       }
 
       const position = resolveMapPoint(mapRect, state.map, enemy.x, enemy.y, rotationQuarterTurns);
       const displaySize = Math.min(mapRect.width / dimensions.cols, mapRect.height / dimensions.rows) * 0.84;
-      enemySprite.setVisible(true);
-      enemySprite.setPosition(position.x, position.y);
-      enemySprite.setDisplaySize(displaySize, displaySize);
-      enemySprite.setAlpha(player.alive ? 0.96 : 0.48);
-      activeEnemyKeys.add(enemyKey);
+      const alpha = player.alive ? 0.96 : 0.48;
+
+      if (!enemySprite.visible) {
+        enemySprite.setVisible(true);
+      }
+      if (enemySprite.x !== position.x || enemySprite.y !== position.y) {
+        enemySprite.setPosition(position.x, position.y);
+      }
+      if (Math.abs(enemySprite.displayWidth - displaySize) > 0.01) {
+        enemySprite.setDisplaySize(displaySize, displaySize);
+      }
+      if (enemySprite.alpha !== alpha) {
+        enemySprite.setAlpha(alpha);
+      }
+      activeEnemyIds.add(enemyId);
     }
   }
 
-  for (const [towerKey, towerSprite] of layer.towerSprites) {
-    if (!activeTowerKeys.has(towerKey)) {
-      towerSprite.destroy();
-      layer.towerSprites.delete(towerKey);
+  for (const [towerId, towerSprite] of layer.towerSprites) {
+    if (!activeTowerIds.has(towerId)) {
+      releaseMinionsTdSprite(layer.towerSpritePool, towerSprite, maxPooledTowerSprites);
+      layer.towerSprites.delete(towerId);
     }
   }
 
-  for (const [enemyKey, enemySprite] of layer.enemySprites) {
-    if (!activeEnemyKeys.has(enemyKey)) {
-      enemySprite.destroy();
-      layer.enemySprites.delete(enemyKey);
+  for (const [enemyId, enemySprite] of layer.enemySprites) {
+    if (!activeEnemyIds.has(enemyId)) {
+      releaseMinionsTdSprite(layer.enemySpritePool, enemySprite, maxPooledEnemySprites);
+      layer.enemySprites.delete(enemyId);
     }
   }
 }

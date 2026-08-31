@@ -62,7 +62,11 @@ export const minionsTdManifest = {
     countdownMs: 2_200,
     resultMs: 4_500,
     scoreboardMs: 4_500
-  }
+  },
+
+  ownsScreens: ["round_intro", "result"],
+  visual: { accent: "#6e8b74", eyebrow: "Tower Defense" },
+  audio: { track: { profile: "strategy", bpm: 96, rootMidi: 43, masterGain: 0.16 } },
 } as const satisfies GameManifest;
 
 export const manifest = minionsTdManifest;

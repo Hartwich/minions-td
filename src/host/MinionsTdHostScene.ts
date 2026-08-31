@@ -20,14 +20,20 @@ import {
   syncMinionsTdSpriteLayer
 } from "./MinionsTdRenderer.js";
 import { loadMinionsTdAssets } from "./minionsTdAssets.js";
+import { renderRoundScreens } from "./roundScreens.js";
+import { bindPlatformTheme, tokens } from "./platformTheme.js";
 
 const minionsTdTextRefreshMs = 200;
 const minionsTdRenderIntervalMs = 1000 / 30;
 const hostTheme = {
   titleFont: '"Oxanium", "Arial", sans-serif',
   bodyFont: '"Nunito Sans", "Arial", sans-serif',
-  text: "#f8fafc",
-  muted: "#94a3b8"
+  get text() {
+    return tokens().color.text;
+  },
+  get muted() {
+    return tokens().color.muted;
+  }
 };
 
 interface HostClientLike {
@@ -90,9 +96,10 @@ export class MinionsTdHostScene extends Phaser.Scene {
   }
 
   create(): void {
+    bindPlatformTheme(this.registry);
     const client = this.registry.get("hostClient") as HostClientLike;
 
-    this.cameras.main.setBackgroundColor("#020617");
+    this.cameras.main.setBackgroundColor(tokens().color.background);
     this.staticLayer = createMinionsTdStaticLayer(this);
     this.dynamicGraphics = this.add.graphics();
     this.dynamicGraphics.setDepth(2);
@@ -125,6 +132,11 @@ export class MinionsTdHostScene extends Phaser.Scene {
       }).setDepth(10)
     );
     this.unsubscribe = client.subscribe((state) => {
+      // Intro and result screens belong to this game, not the platform.
+      if (renderRoundScreens(this, state)) {
+        return;
+      }
+
       const renderStamp = [
         state.room?.code ?? "----",
         state.room?.lifecycle ?? "unknown",

@@ -65,7 +65,7 @@ export const minionsTdManifest = {
   },
 
   ownsScreens: ["round_intro", "result"],
-  visual: { accent: "#6e8b74", eyebrow: "Tower Defense" },
+  visual: { accent: "#6e8b74", icon: "tower", eyebrow: "Tower Defense" },
   audio: { track: { profile: "strategy", bpm: 96, rootMidi: 43, masterGain: 0.16 } },
 } as const satisfies GameManifest;
 

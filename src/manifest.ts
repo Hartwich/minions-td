@@ -1,3 +1,4 @@
+import { minionsTdText } from "./catalogText.js";
 import type { GameManifest } from "@open-party-lab/game-core";
 import { minionsTdSetupConfig } from "./protocol.js";
 import {
@@ -8,6 +9,7 @@ import {
 
 export const minionsTdManifest = {
   id: "minions-td",
+  translations: minionsTdText,
   displayName: "MinionsTD",
   description: "Baue Tower, schicke Minions weiter und halte deine Lane laenger als die anderen.",
   minPlayers: 2,

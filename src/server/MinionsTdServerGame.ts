@@ -952,7 +952,10 @@ export const minionsTdServerGame: ServerGame<MinionsTdRuntimeState, MinionsTdInp
     return state.phase === "locked";
   },
   buildScore(state) {
-    return resolvePlacements(state.players);
+    return resolvePlacements(state.players).map((entry) => ({
+      ...entry,
+      reason: state.language === "en" ? "MinionsTD placement" : "MinionsTD Platzierung"
+    }));
   },
   toPublicState(state) {
     return toPublicMinionsTdState(state);

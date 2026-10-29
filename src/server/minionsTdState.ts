@@ -1,3 +1,4 @@
+import { localizeMinionsTdContent } from "../contentText.js";
 import type { BaseRoundState, GamePlayerSummary, SupportedLanguage } from "@open-party-lab/game-core";
 import type {
   MinionsTdEnemyState,
@@ -151,8 +152,8 @@ export function toPublicMinionsTdState(state: MinionsTdRuntimeState): MinionsTdS
     remainingMs: state.remainingMs,
     startingLives: state.startingLives,
     startingGold: state.startingGold,
-    towerCatalog: [...minionsTdTowerCatalog],
-    enemyCatalog: [...minionsTdEnemyCatalog],
+    towerCatalog: localizeMinionsTdContent([...minionsTdTowerCatalog], state.language),
+    enemyCatalog: localizeMinionsTdContent([...minionsTdEnemyCatalog], state.language),
     players: state.players.map((player) => ({
       playerId: player.playerId,
       name: player.name,
@@ -161,7 +162,7 @@ export function toPublicMinionsTdState(state: MinionsTdRuntimeState): MinionsTdS
       lives: player.lives,
       alive: player.alive,
       towers: player.towers.map(({ totalInvested: _totalInvested, ...tower }) => ({
-        ...tower
+        ...localizeMinionsTdContent(tower, state.language)
       })),
       enemies: player.enemies.map((enemy: MinionsTdEnemyState) => ({
         ...enemy
@@ -199,8 +200,8 @@ export function toControllerMinionsTdState(
     remainingMs: state.remainingMs,
     startingLives: state.startingLives,
     startingGold: state.startingGold,
-    towerCatalog: minionsTdControllerTowerCatalog,
-    enemyCatalog: minionsTdControllerEnemyCatalog,
+    towerCatalog: localizeMinionsTdContent(minionsTdControllerTowerCatalog, state.language),
+    enemyCatalog: localizeMinionsTdContent(minionsTdControllerEnemyCatalog, state.language),
     players: state.players.map((player) => {
       const isCurrentPlayer = player.playerId === currentPlayerId;
 
@@ -213,7 +214,7 @@ export function toControllerMinionsTdState(
         alive: player.alive,
         towers: isCurrentPlayer
           ? player.towers.map(({ totalInvested: _totalInvested, ...tower }) => ({
-              ...tower
+              ...localizeMinionsTdContent(tower, state.language)
             }))
           : [],
         enemies: [],

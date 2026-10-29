@@ -44,7 +44,8 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "dev": "npm run typecheck",
-    "pack:dry-run": "npm pack --dry-run"
+    "pack:dry-run": "npm pack --dry-run",
+    "test:localization": "npm run build && node --test scripts/localization.test.mjs"
   },
   "peerDependencies": {
     "@open-party-lab/game-core": "0.1.0",
